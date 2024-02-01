@@ -1,0 +1,9 @@
+File			Description
+----			-----------
+2022R2_thermal.wbpz	Ansys 2022R2 archive containing thermal nosecone model and target structural model for temperature mapping
+writetemps.inp		APDL commands used to export temperatures from thermal nosecone model (same commands as in Commands object of thermal model)
+importACTscript.py	ACT (Python) script to setup and populate fields for imported temperature load object (same as lines 88 - 117 in journal script)
+loadfiledata.wbjn	ACT Journal (Python) script to import temperatures from thermal model and transfer to target model via imported load object
+tmap.py			PyAnsys script to map temperatures from thermal model to target model directly (no imported load object) and write APDL commands to run structural model
+tmap2.py		PyAnsys script to map temperatures from ascii text tempartures (same format as External Data uses) and write APDL commands to run structural model
+textport.py		ACT (Python) script to export temperatures from thermal nosecond model. This is an alternative to writetemps.inp

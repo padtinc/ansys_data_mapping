@@ -1,0 +1,121 @@
+#SetScriptVersion(Version="22.2.192")
+"""
+This is a Python Journal script which creates an External Data object populated by ascii
+text output files residing the user_files folder of this project. these files are themselves
+created by other scripts. Finally, the script transfers the data content of the external files
+to an imported load object in a 'target system' within the same project
+"""
+import string
+import glob
+import os
+
+targetSystemName = "Static Structural Target"	#target system for imported load object
+#path to source data files (currently the user_files folder of this project. Change as necessary)
+filepath = r"C:\Users\alex.grishin\raytheon_officehours\2022R2_thermal_files\user_files"
+namedSelection = "mapbodies"
+#delimiterIs="Tab"				#for reading files written by the ACT extension
+#delimiterStringIs=r"\t"		#for reading files written by the ACT extension
+delimiterIs="Comma"				#for reading files written by the APDL Commands object
+delimiterStringIs=","			#for reading files written by the APDL Commands object
+ext = "xls"						#for ACT extension OR APDL: The xls extension can accomodate comma or tab delimiter)
+lunit = "m"						#length units for loads data transfer
+startLine = 2					#Starting line to parse exteran data files
+
+#path to source data times
+timepath = os.path.join(filepath,'RTIMES.txt')
+
+template1 = GetTemplate(TemplateName="External Data")
+systems = GetAllSystems()
+for system in systems:
+    if system.DisplayText == targetSystemName:
+	    break
+		
+system2 = template1.CreateSystem(
+    Position="Left",
+    RelativeTo=system)
+	
+setup = system2.GetContainer(ComponentName="Setup")
+
+filedata = []
+filedataprop = []
+columndata = []
+counter = 0
+
+resultfiles = glob.glob1(filepath,"*."+ext)
+resultfiles.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
+numfiles = len(resultfiles)
+
+for i in range(numfiles):
+    #filename = string.upper(basename) + str(i+1) + "." + ext
+    fpath = filepath + "/" + resultfiles[i]
+    filedata.append(setup.AddDataFile(FilePath=fpath))
+    filedataprop.append(filedata[-1].GetDataProperty())
+    filedata[-1].SetDelimiterType(FileDataProperty=filedataprop[-1],Delimiter=delimiterIs,DelimiterString=delimiterStringIs)
+    filedata[-1].SetStartImportAtLine(FileDataProperty=filedataprop[-1],LineNumber=startLine)
+    if not counter:
+	    columnName = "ExternalLoadColumnData"
+    else:
+	    columnName = "ExternalLoadColumnData " + str(counter)
+    filedataprop[-1].SetLengthUnit(Unit=lunit)
+    columndata.append(filedataprop[-1].GetColumnData(Name=columnName))
+    filedataprop[-1].SetColumnDataType(ColumnData=columndata[-1],DataType="Node ID")
+    counter += 1
+    columnName = "ExternalLoadColumnData " + str(counter)
+    columndata.append(filedataprop[-1].GetColumnData(Name=columnName))
+    filedataprop[-1].SetColumnDataType(ColumnData=columndata[-1],DataType="X Coordinate")
+    counter += 1
+    columnName = "ExternalLoadColumnData " + str(counter)
+    columndata.append(filedataprop[-1].GetColumnData(Name=columnName))
+    filedataprop[-1].SetColumnDataType(ColumnData=columndata[-1],DataType="Y Coordinate")
+    counter += 1
+    columnName = "ExternalLoadColumnData " + str(counter)
+    columndata.append(filedataprop[-1].GetColumnData(Name=columnName))
+    filedataprop[-1].SetColumnDataType(ColumnData=columndata[-1],DataType="Z Coordinate")
+    counter += 1
+    columnName = "ExternalLoadColumnData " + str(counter)
+    columndata.append(filedataprop[-1].GetColumnData(Name=columnName))
+    filedataprop[-1].SetColumnDataType(ColumnData=columndata[-1],DataType="Temperature")
+    counter += 1
+    columndata[-1].Identifier = resultfiles[i]
+
+comp2 = system.GetComponent(Name='Setup')
+setup2 = system.GetContainer(ComponentName='Setup')
+comp1 = system2.GetComponent(Name='Setup')
+comp1.TransferData(TargetComponent=comp2)
+comp1.Update(AllDependencies=True)
+comp2.Refresh()
+setup2.Edit()
+
+scriptCommands=r"""
+with Transaction():
+    import glob
+    import os
+
+    datapath = r'{0}'
+    timepath = r'{1}'
+    fext = '{2}'
+    namedSelStr = '{3}'
+    resultfiles = glob.glob1(datapath,"*."+fext)
+    resultfiles.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
+    analysis = ExtAPI.DataModel.Project.Model.Analyses[0]
+    with open(timepath,"r") as r:
+        data = r.read().strip()
+        datalist = data.split('\n')
+    times = map(float,datalist)
+    numfilestoload = len(resultfiles)
+    importedloadobjects = [child for child in analysis.Children if child.DataModelObjectCategory.ToString() == "ImportedLoadGroup"]
+    lastimportedloadobj = importedloadobjects[-1]
+    importedTemperature = lastimportedloadobj.AddImportedBodyTemperature()
+    named_selection = ExtAPI.DataModel.GetObjectsByName(namedSelStr)[0]
+    importedTemperature.Location = named_selection
+    table = importedTemperature.GetTableByName("")
+    for i in range(numfilestoload-1):
+        table.Add(None)
+    for i in range(numfilestoload):
+        table[i][0]="File"+str(i+1)+":"+str(resultfiles[i])
+        table[i][1]=times[i]
+    importedTemperature.ImportLoad()
+""".format(filepath,timepath,ext,namedSelection)
+
+model2 = system.GetContainer(ComponentName='Model')
+model2.SendCommand(Language="Python",Command=scriptCommands)

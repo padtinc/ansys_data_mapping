@@ -1,0 +1,81 @@
+!This is an APDL script used to export temperature results to N 
+!text files (where N is the number of load steps in the result) 
+!from an Ansys thermal or structural model from the Mechanical 
+!interface or from the MAPDL interface. 
+!The script first writes the files to the Solver Files Directory,
+!and then copies them to the project's user_files directory.
+!If using the Workbench application (from a Commmands object), 
+!users should first make sure that the Ansys db file is getting
+!written. This can be accomplished by setting Analysis Settings->
+!Analysis DataManagement->Save MAPDL db to "Yes" in the Mechanical
+!tree outline
+!
+!The text data should be in the following format:
+!column 1	column 2	column 3	column 4	Column5
+!--------    --------	--------	--------	-------
+!Node Id		X-coord.	Y-coord.	Z-coord.	Temperature
+
+fini
+resume
+
+/post1
+*get,nsets,active,,set,nset
+set,last
+allsel,
+*get,maxn,node,0,num,max
+*del,nnums,,nopr
+*del,nmask,,nopr
+*del,coords,,nopr
+*dim,nnums,,maxn
+*dim,nmask,,maxn
+*dim,coords,,maxn,3
+*dim,svals,,maxn
+*dim,rtimes,,nsets
+*vfill,nnums(1),ramp,1,1
+*vget,nmask(1),node,1,nsel
+*vmask,nmask(1)
+*vget,coords(1,1),node,1,loc,x
+*vmask,nmask(1)
+*vget,coords(1,2),node,1,loc,y
+*vmask,nmask(1)
+*vget,coords(1,3),node,1,loc,z
+!*cfopen,modelnodes,xls
+!*vmask,nmask(1)
+!*vwrite,nnums(1),coords(1,1),coords(1,2),coords(1,3)
+!%i,%g,%g,%g
+!*cfclos
+
+*do,i,1,nsets
+    set,,,,,,,i
+	*get,rtimes(i),active,,set,time
+	*vmask,nmask(1)
+	*vget,svals(1),node,1,temp
+	fname = 'tresult%i%'
+	*cfopen,%fname%,xls
+	*vwrite,'node num','x coord','y coord','z coord','temperature'
+	%c,%c,%c,%c,%c
+	*vmask,nmask(1)
+	*vwrite,nnums(1),coords(1,1),coords(1,2),coords(1,3),svals(1)
+	%i,%g,%g,%g,%g
+	*cfclos
+	*del,path1
+	*dim,path1,string,248
+	path1(1) = _wb_userfiles_dir(1)
+	path1(1) = strcat(path1(1),%fname%)
+	/copy,%fname%,xls,,path1(1),xls
+    /delete,%fname%,xls
+*enddo
+
+fname = 'rtimes'
+*cfopen,%fname%,txt
+*vwrite,rtimes(1)
+%g
+*cfclos
+
+*dim,path2,string,248
+path2(1) = _wb_userfiles_dir(1)
+path2(1)=strcat(path2(1),%fname%)
+/copy,%fname%,txt,,path2(1),txt
+/delete,%fname%,txt
+
+
